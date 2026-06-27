@@ -53,8 +53,8 @@ def initialize_services():
         return None
 
 
-def run_analysis_loop(services: dict):
-    """Run the main analysis loop."""
+def run_analysis_loop(services: dict, frame_placeholder, analysis_placeholder, chart_placeholder, sidebar_placeholder, metrics_placeholders):
+    """Run the main analysis loop components continuously."""
     session_service = services["session_service"]
     camera = services["camera"]
     vision = services["vision"]
@@ -64,21 +64,20 @@ def run_analysis_loop(services: dict):
     analytics = services["analytics"]
 
     if not session_service.is_session_active():
-        st.warning("No active session")
-        return
+        return False
 
     # Get frame
     frame = camera.get_frame()
     if frame is None:
-        st.warning("Could not capture frame")
-        return
+        frame_placeholder.warning("Could not capture frame")
+        return True
 
     # Analyze vision
     vision_analysis = vision.analyze_frame(frame)
 
     if not vision_analysis.get("analysis_successful"):
-        st.warning("Vision analysis failed")
-        return
+        analysis_placeholder.warning("Vision analysis failed")
+        return True
 
     detected_objects = vision_analysis.get("detected_objects", [])
     head_pose = vision_analysis.get("head_pose", {})
@@ -119,18 +118,49 @@ def run_analysis_loop(services: dict):
     if voice.should_speak() and ai_analysis.get("voice_message"):
         voice.speak_async(ai_analysis["voice_message"])
 
+    # --- Live Rendering Updates ---
+    
+    # 1. Update Video Frame Display
+    display_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame_placeholder.image(display_frame, use_container_width=True)
+
+    # 2. Update Live Analysis Sub-metrics
+    with analysis_placeholder:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            color = "🟢" if focus_score >= 80 else "🟡" if focus_score >= 50 else "🔴"
+            st.metric(f"{color} Focus Score", f"{focus_score}/100")
+        with col2:
+            st.metric("📊 State", ai_analysis.get("study_state", "Idle"))
+        with col3:
+            st.metric("🔍 Objects", len(detected_objects))
+
+    # 3. Update Chart
+    if session_service.current_session:
+        scores = [fs.score for fs in session_service.current_session.focus_scores]
+        if scores:
+            with chart_placeholder:
+                from ui.charts import create_focus_trend_chart
+                st.plotly_chart(
+                    create_focus_trend_chart(scores),
+                    use_container_width=True,
+                )
+
+    # 4. Update Sidebar AI Insights Container
+    sidebar_placeholder.info(ai_analysis.get("voice_message", "Analyzing..."))
+
+    # 5. Update Bottom Session Analytics Layout
+    stats = session_service.get_session_stats()
+    m_col1, m_col2, m_col3, m_col4 = metrics_placeholders
+    m_col1.metric("Study Time", format_duration(stats.get("study_duration", 0)))
+    m_col2.metric("Peak Focus", f"{stats.get('max_focus_score', 0)}/100")
+    m_col3.metric("Distractions", stats.get("distractions_count", 0))
+    m_col4.metric("Events", stats.get("events_count", 0))
+
     logger.debug(
         f"Analysis: Focus={focus_score}, State={ai_analysis.get('study_state')}, Objects={detected_objects}"
     )
-
-    return {
-        "frame": frame,
-        "detected_objects": detected_objects,
-        "focus_score": focus_score,
-        "study_state": ai_analysis.get("study_state"),
-        "head_pose": head_pose,
-        "ai_analysis": ai_analysis,
-    }
+    return True
 
 
 def main():
@@ -165,16 +195,13 @@ def main():
 
     services = st.session_state.services
 
-    # Sidebar
+    # Sidebar UI Layout
     with st.sidebar:
         st.markdown("# 🎯 FocusLens")
         st.markdown("### AI Study Intelligence")
-
         st.divider()
 
-        # Configuration validation
         st.subheader("🔐 Configuration")
-
         if Config.GEMINI_API_KEY:
             st.success("✓ Gemini API configured")
         else:
@@ -187,9 +214,7 @@ def main():
 
         st.divider()
 
-        # Quick controls
         st.subheader("⚡ Quick Control")
-
         col1, col2 = st.columns(2)
 
         with col1:
@@ -210,159 +235,86 @@ def main():
 
         st.divider()
 
-        # Settings
         st.subheader("⚙️ Settings")
-
-        voice_toggle = st.checkbox(
-            "🔊 Voice",
-            value=services["voice"].enabled,
-        )
+        voice_toggle = st.checkbox("🔊 Voice", value=services["voice"].enabled)
         services["voice"].enabled = voice_toggle
 
-        show_camera = st.checkbox(
-            "📹 Show Camera",
-            value=True,
-        )
-
+        show_camera = st.checkbox("📹 Show Camera", value=True)
         st.divider()
 
-        # Session info
-        if services["session_service"].is_session_active():
-            st.subheader("📊 Session Stats")
+        # Context-dependent Sidebar Stats Container
+        sidebar_stats_container = st.container()
 
-            stats = services["session_service"].get_session_stats()
-
-            st.metric(
-                "⏱️ Study Time",
-                format_duration(stats.get("study_duration", 0)),
-            )
-
-            st.metric(
-                "🎯 Avg Focus",
-                f"{stats.get('average_focus_score', 0):.0f}/100",
-            )
-
-            st.metric(
-                "⚠️ Distractions",
-                stats.get("distractions_count", 0),
-            )
-
-        else:
-            st.info("📌 No active session")
-
-    # Main content
+    # Main Dashboard Header Layout
     st.markdown("# 🎯 FocusLens Dashboard")
     st.markdown(f"*AI Study Intelligence • {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
-
     st.divider()
 
+    # Handling Non-Active Session State View
     if not services["session_service"].is_session_active():
+        with sidebar_stats_container:
+            st.info("📌 No active session")
+            
         st.info("👈 Start a session from the sidebar to begin!")
-
-        # Show info
         with st.expander("📖 How to Use FocusLens"):
             st.markdown("""
             ### Getting Started
-            
             1. **Start a Session**: Click the ▶ Start button
             2. **Position Camera**: Ensure your workspace is visible
             3. **Begin Studying**: The AI will monitor your focus in real-time
             4. **Get Guidance**: Receive voice tips and on-screen suggestions
             5. **End Session**: Click ⏹ Stop to finalize the session
-            
-            ### Features
-            
-            - 🎯 **Focus Tracking**: Real-time focus score assessment
-            - 📱 **Distraction Detection**: Phone and other distraction alerts
-            - 🧠 **AI Reasoning**: Gemini-powered insights and recommendations
-            - 🔊 **Voice Guidance**: Natural language AI assistant
-            - 📊 **Analytics**: Comprehensive reports and trends
-            - ☕ **Break Recommendations**: Smart break suggestions
-            
-            ### Navigation
-            
-            - **📊 Analytics**: View detailed productivity patterns
-            - **📄 Reports**: Generate comprehensive study reports
-            - **⚙️ Settings**: Configure preferences
             """)
-
         return
 
-    # Active session content
+    # --- Setup Structural Placeholders for Streaming Loop ---
     col_main, col_sidebar = st.columns([3, 1])
 
     with col_main:
         st.subheader("📹 Live Analysis")
-
-        # Placeholder for analysis
         placeholder_frame = st.empty()
         placeholder_analysis = st.empty()
         placeholder_chart = st.empty()
 
-        # Run analysis
-        analysis_result = run_analysis_loop(services)
-
-        if analysis_result:
-            # Display frame
-            with placeholder_frame:
-                # Convert to RGB for display
-                display_frame = cv2.cvtColor(analysis_result["frame"], cv2.COLOR_BGR2RGB)
-                st.image(display_frame, use_column_width=True)
-
-            # Display analysis
-            with placeholder_analysis:
-                col1, col2, col3 = st.columns(3)
-
-                with col1:
-                    score = analysis_result["focus_score"]
-                    color = "🟢" if score >= 80 else "🟡" if score >= 50 else "🔴"
-                    st.metric(f"{color} Focus Score", f"{score}/100")
-
-                with col2:
-                    state = analysis_result["study_state"]
-                    st.metric("📊 State", state)
-
-                with col3:
-                    objects = len(analysis_result["detected_objects"])
-                    st.metric("🔍 Objects", objects)
-
-            # Display chart
-            with placeholder_chart:
-                if services["session_service"].current_session:
-                    scores = [fs.score for fs in services["session_service"].current_session.focus_scores]
-                    if scores:
-                        from ui.charts import create_focus_trend_chart
-                        st.plotly_chart(
-                            create_focus_trend_chart(scores),
-                            use_container_width=True,
-                        )
-
     with col_sidebar:
         st.subheader("💬 AI Insight")
-        if analysis_result:
-            st.info(analysis_result["ai_analysis"].get("voice_message", "Analyzing..."))
+        placeholder_ai_insight = st.empty()
 
     st.divider()
-
-    # Additional info
     st.subheader("📌 Current Session Details")
+    
+    # Initialize Persistent Bottom Metrics Layout Block
+    m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+    metrics_elements = (m_col1.empty(), m_col2.empty(), m_col3.empty(), m_col4.empty())
 
-    if services["session_service"].is_session_active():
-        stats = services["session_service"].get_session_stats()
+    # --- Live Running Driver Core Loop ---
+    while services["session_service"].is_session_active():
+        # Update Sidebar Live Session Metrics Counter UI Panel
+        with sidebar_stats_container:
+            stats = services["session_service"].get_session_stats()
+            st.metric("⏱️ Study Time", format_duration(stats.get("study_duration", 0)))
+            st.metric("🎯 Avg Focus", f"{stats.get('average_focus_score', 0):.0f}/100")
+            st.metric("⚠️ Distractions", stats.get("distractions_count", 0))
 
-        col1, col2, col3, col4 = st.columns(4)
+        # Check if the user turned off the camera view feature via toggle
+        if not show_camera:
+            placeholder_frame.info("Camera view visibility disabled by preference.")
 
-        with col1:
-            st.metric("Study Time", format_duration(stats.get("study_duration", 0)))
-
-        with col2:
-            st.metric("Peak Focus", f"{stats.get('max_focus_score', 0)}/100")
-
-        with col3:
-            st.metric("Distractions", stats.get("distractions_count", 0))
-
-        with col4:
-            st.metric("Events", stats.get("events_count", 0))
+        # Run one tick of downstream operations and data analysis pipeline
+        keep_looping = run_analysis_loop(
+            services,
+            frame_placeholder=placeholder_frame if show_camera else st.empty(),
+            analysis_placeholder=placeholder_analysis,
+            chart_placeholder=placeholder_chart,
+            sidebar_placeholder=placeholder_ai_insight,
+            metrics_placeholders=metrics_elements
+        )
+        
+        if not keep_looping:
+            break
+            
+        # Match loop intervals to hardware configuration values (~30 FPS or custom interval sleep)
+        time.sleep(0.1)
 
 
 if __name__ == "__main__":
