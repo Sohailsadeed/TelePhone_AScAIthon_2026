@@ -22,7 +22,7 @@ class VisionService:
     def __init__(self):
         """Initialize vision service."""
         self.api_key = Config.AFFERENS_API_KEY
-        self.api_endpoint = "https://api.afferens.ai/v1/vision"  # Update with actual endpoint
+        self.api_endpoint = "https://afferens.com/api/demo?modality=VISION"  # Update with actual endpoint
         self.last_detection = None
         self.detection_history = []
 
@@ -49,20 +49,11 @@ class VisionService:
 
             # Call Afferens API
             headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
+                "X-API-KEY": self.api_key,
             }
 
-            payload = {
-                "image": frame_b64,
-                "detect_objects": True,
-                "detect_head_pose": True,
-                "detect_emotions": False,
-            }
-
-            response = requests.post(
+            response = requests.get(
                 self.api_endpoint,
-                json=payload,
                 headers=headers,
                 timeout=10,
             )
