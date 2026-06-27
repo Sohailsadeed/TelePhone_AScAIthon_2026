@@ -144,3 +144,6 @@ reports/
 # Temp
 temp/
 tmp/
+.repo_tmp/
+FETCH_HEAD
+git
