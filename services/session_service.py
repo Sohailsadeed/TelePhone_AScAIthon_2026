@@ -28,9 +28,12 @@ class SessionService:
         try:
             session_id = generate_session_id()
             start_time = datetime.now()
+            db_start_time = start_time
+            if isinstance(db_start_time, datetime):
+                db_start_time = db_start_time.isoformat()
 
             # Create in database
-            self.db.create_session(session_id, start_time, notes)
+            self.db.create_session(session_id, db_start_time, notes)
 
             # Create session object
             self.current_session = Session(
@@ -54,9 +57,12 @@ class SessionService:
         try:
             end_time = datetime.now()
             self.current_session.end_time = end_time
+            db_end_time = end_time
+            if isinstance(db_end_time, datetime):
+                db_end_time = db_end_time.isoformat()
 
             # Update in database
-            self.db.end_session(self.current_session.session_id, end_time)
+            self.db.end_session(self.current_session.session_id, db_end_time)
 
             # Calculate final stats
             self.current_session.study_duration = self._calculate_study_duration(
@@ -133,6 +139,9 @@ class SessionService:
         try:
             event_id = str(uuid4())[:8]
             timestamp = datetime.now()
+            db_timestamp = timestamp
+            if isinstance(db_timestamp, datetime):
+                db_timestamp = db_timestamp.isoformat()
 
             event = Event(
                 event_id=event_id,
@@ -152,7 +161,7 @@ class SessionService:
                 event_id=event_id,
                 session_id=self.current_session.session_id,
                 event_type=event_type,
-                timestamp=timestamp,
+                timestamp=db_timestamp,
                 study_state=study_state,
                 focus_score=focus_score,
                 detected_objects=detected_objects,
@@ -181,6 +190,9 @@ class SessionService:
 
         try:
             timestamp = datetime.now()
+            db_timestamp = timestamp
+            if isinstance(db_timestamp, datetime):
+                db_timestamp = db_timestamp.isoformat()
 
             fs = FocusScore(
                 session_id=self.current_session.session_id,
@@ -193,7 +205,7 @@ class SessionService:
             # Save to database
             self.db.create_focus_score(
                 session_id=self.current_session.session_id,
-                timestamp=timestamp,
+                timestamp=db_timestamp,
                 score=score,
                 study_state=study_state,
                 detected_objects=detected_objects,
@@ -219,6 +231,9 @@ class SessionService:
         try:
             distraction_id = str(uuid4())[:8]
             timestamp = datetime.now()
+            db_timestamp = timestamp
+            if isinstance(db_timestamp, datetime):
+                db_timestamp = db_timestamp.isoformat()
 
             distraction = Distraction(
                 distraction_id=distraction_id,
@@ -233,7 +248,7 @@ class SessionService:
             self.db.create_distraction(
                 distraction_id=distraction_id,
                 session_id=self.current_session.session_id,
-                timestamp=timestamp,
+                timestamp=db_timestamp,
                 object_type=object_type,
                 duration_seconds=duration_seconds,
                 response_message=response_message,

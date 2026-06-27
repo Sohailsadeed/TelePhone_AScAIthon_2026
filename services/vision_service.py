@@ -22,7 +22,7 @@ class VisionService:
     def __init__(self):
         """Initialize vision service."""
         self.api_key = Config.AFFERENS_API_KEY
-        self.api_endpoint = "https://api.afferens.ai/v1/vision"  # Update with actual endpoint
+        self.api_endpoint = "https://afferens.com/api/demo?modality=VISION"
         self.last_detection = None
         self.detection_history = []
 
@@ -42,37 +42,36 @@ class VisionService:
             return self._get_mock_detection()
 
         try:
-            # Convert frame to base64
-            frame_b64 = self.frame_to_base64(frame)
-            if not frame_b64:
-                return self._get_mock_detection()
-
             # Call Afferens API
             headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
+                "X-API-KEY": self.api_key,
             }
 
-            payload = {
-                "image": frame_b64,
-                "detect_objects": True,
-                "detect_head_pose": True,
-                "detect_emotions": False,
-            }
-
-            response = requests.post(
+            response = requests.get(
                 self.api_endpoint,
-                json=payload,
                 headers=headers,
                 timeout=10,
             )
+
+            logger.debug(f"Afferens raw response: {response.text}")
 
             if response.status_code == 200:
                 result = response.json()
                 self.last_detection = result
                 self.detection_history.append(result)
                 logger.debug(f"Detection successful: {len(result.get('objects', []))} objects")
-                return result
+                if "data" in result and len(result["data"]) > 0:
+                    actual_data = result["data"][0].get("data", {})
+                    return {
+                        "objects": actual_data.get("objects", []),
+                        "head_pose": {
+                            "is_looking": True,
+                            "yaw": 0,
+                            "fatigue_level": "Normal",
+                            "confidence": 0.9
+                        }
+                    }
+                return self._get_mock_detection()
             else:
                 logger.error(f"API error: {response.status_code}")
                 return self._get_mock_detection()
@@ -87,7 +86,7 @@ class VisionService:
         objects = []
 
         for obj in detection.get("objects", []):
-            obj_name = obj.get("name", "").lower()
+            obj_name = obj.get("label", "").lower()
             if obj_name in DETECTABLE_OBJECTS:
                 objects.append(obj_name)
 

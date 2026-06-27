@@ -22,7 +22,7 @@ class Database:
 
     def _initialize(self):
         """Initialize database and create tables."""
-        self.conn = sqlite3.connect(self.db_path)
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self._create_tables()
 
@@ -182,7 +182,15 @@ class Database:
             INSERT INTO sessions (session_id, start_time, created_at, notes)
             VALUES (?, ?, ?, ?)
         """
-        return self.insert(query, (session_id, start_time.isoformat(), datetime.now().isoformat(), notes))
+        return self.insert(
+            query,
+            (
+                session_id,
+                start_time if isinstance(start_time, str) else start_time.isoformat(),
+                datetime.now().isoformat(),
+                notes,
+            ),
+        )
 
     def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get session by ID."""
@@ -198,7 +206,10 @@ class Database:
 
     def end_session(self, session_id: str, end_time: datetime) -> bool:
         """End a session."""
-        return self.update_session(session_id, end_time=end_time.isoformat())
+        return self.update_session(
+            session_id,
+            end_time=end_time if isinstance(end_time, str) else end_time.isoformat(),
+        )
 
     def get_all_sessions(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Get all sessions."""
@@ -240,7 +251,7 @@ class Database:
             event_id,
             session_id,
             event_type,
-            timestamp.isoformat(),
+            timestamp if isinstance(timestamp, str) else timestamp.isoformat(),
             study_state,
             focus_score,
             json.dumps(detected_objects),
@@ -274,7 +285,7 @@ class Database:
         """
         params = (
             session_id,
-            timestamp.isoformat(),
+            timestamp if isinstance(timestamp, str) else timestamp.isoformat(),
             score,
             study_state,
             json.dumps(detected_objects),
@@ -306,7 +317,7 @@ class Database:
         params = (
             distraction_id,
             session_id,
-            timestamp.isoformat(),
+            timestamp if isinstance(timestamp, str) else timestamp.isoformat(),
             object_type,
             duration_seconds,
             response_message,

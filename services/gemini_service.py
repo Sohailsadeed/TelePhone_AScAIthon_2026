@@ -2,7 +2,7 @@
 Gemini service for AI reasoning and analysis.
 """
 
-import google.generativeai as genai
+from google import genai
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import json
@@ -26,16 +26,15 @@ class GeminiService:
     def __init__(self):
         """Initialize Gemini service."""
         if Config.GEMINI_API_KEY:
-            genai.configure(api_key=Config.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel(Config.GEMINI_MODEL)
+            self.client = genai.Client(api_key=Config.GEMINI_API_KEY)
         else:
             logger.warning("Gemini API key not configured")
-            self.model = None
+            self.client = None
 
     def _ensure_initialized(self) -> bool:
         """Ensure model is initialized."""
-        if not self.model:
-            logger.error("Gemini model not initialized")
+        if not self.client:
+            logger.error("Gemini client not initialized")
             return False
         return True
 
@@ -50,7 +49,10 @@ class GeminiService:
 
         try:
             prompt = get_vision_analysis_prompt(detected_objects, head_pose)
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=Config.GEMINI_MODEL,
+                contents=prompt
+            )
             result = parse_gemini_response(response.text)
             logger.debug(f"Vision analysis: {result.get('study_state')}")
             return result
@@ -65,7 +67,10 @@ class GeminiService:
 
         try:
             prompt = get_session_summary_prompt(session_data)
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=Config.GEMINI_MODEL,
+                contents=prompt
+            )
             result = parse_gemini_response(response.text)
             logger.debug("Session summary generated")
             return result
@@ -80,7 +85,10 @@ class GeminiService:
 
         try:
             prompt = get_weekly_report_prompt(stats)
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=Config.GEMINI_MODEL,
+                contents=prompt
+            )
             result = parse_gemini_response(response.text)
             logger.debug("Weekly report generated")
             return result
@@ -99,7 +107,10 @@ class GeminiService:
 
         try:
             prompt = get_distraction_response_prompt(distraction_type)
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=Config.GEMINI_MODEL,
+                contents=prompt
+            )
             result = parse_gemini_response(response.text)
             logger.debug(f"Distraction response: {distraction_type}")
             return result
@@ -125,7 +136,10 @@ class GeminiService:
             prompt = get_break_recommendation_prompt(
                 study_duration_minutes, focus_score, fatigue_level
             )
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=Config.GEMINI_MODEL,
+                contents=prompt
+            )
             result = parse_gemini_response(response.text)
             logger.debug(f"Break recommendation: should_break={result.get('should_break')}")
             return result
@@ -139,7 +153,10 @@ class GeminiService:
             return "Analysis unavailable"
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=Config.GEMINI_MODEL,
+                contents=prompt
+            )
             return response.text
         except Exception as e:
             logger.error(f"Gemini stream error: {e}")
