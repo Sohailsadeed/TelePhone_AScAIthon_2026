@@ -34,7 +34,7 @@ class GeminiService:
     def _ensure_initialized(self) -> bool:
         """Ensure model is initialized."""
         if not self.client:
-            logger.error("Gemini client not initialized")
+            logger.error("Gemini model not initialized")
             return False
         return True
 

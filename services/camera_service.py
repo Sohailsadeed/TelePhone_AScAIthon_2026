@@ -109,10 +109,16 @@ class CameraService:
 
     def release(self):
         """Release camera."""
-        if self.cap is not None:
-            self.cap.release()
+        try:
+            if self.cap is not None:
+                self.cap.release()
+                self.cap = None
+            cv2.destroyAllWindows()
             self.is_initialized = False
+            self.last_frame = None
             logger.info("Camera released")
+        except Exception as e:
+            logger.error(f"Error releasing camera: {e}")
 
     def __del__(self):
         """Cleanup on deletion."""
