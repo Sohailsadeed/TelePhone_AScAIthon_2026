@@ -81,6 +81,12 @@ def run_analysis_loop(services: dict, frame_placeholder, analysis_placeholder, c
 
     detected_objects = vision_analysis.get("detected_objects", [])
     head_pose = vision_analysis.get("head_pose", {})
+    if "timestamp" in head_pose:
+        head_pose["timestamp"] = (
+            head_pose["timestamp"].isoformat()
+            if isinstance(head_pose["timestamp"], datetime)
+            else head_pose["timestamp"]
+        )
 
     # Get AI analysis
     ai_analysis = gemini.analyze_vision(detected_objects, head_pose)

@@ -64,7 +64,7 @@ class Config:
     FOCUS_SCORE_THRESHOLD: int = int(os.getenv("FOCUS_SCORE_THRESHOLD", "80"))
 
     # Model
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
     TEMPERATURE: float = float(os.getenv("TEMPERATURE", "0.7"))
     MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "500"))
 
