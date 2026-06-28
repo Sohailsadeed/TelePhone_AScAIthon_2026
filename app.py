@@ -229,6 +229,7 @@ def main():
             if st.button("⏹ Stop", use_container_width=True, key="stop_btn"):
                 session = services["session_service"].end_session()
                 if session:
+                    services["camera"].release()
                     st.session_state.active_session = None
                     st.success("Session ended!")
                     st.rerun()
